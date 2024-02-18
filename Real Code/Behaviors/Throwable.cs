@@ -37,75 +37,83 @@ namespace RockCompany.Behaviors
             base.ItemActivate(used, buttonDown);
             if (base.IsOwner)
             {
-                objectsHitByRock = Physics.SphereCastAll(new Ray(playerHeldBy.gameplayCamera.transform.position, playerHeldBy.gameplayCamera.transform.forward),3f,20f, shovelMask, QueryTriggerInteraction.Collide);
+                objectsHitByRock = Physics.SphereCastAll(new Ray(playerHeldBy.gameplayCamera.transform.position+(Vector3.up*-0.15f), playerHeldBy.gameplayCamera.transform.forward),1f,20f, shovelMask, QueryTriggerInteraction.Collide);
                 objectsHitByRockList = objectsHitByRock.OrderBy((RaycastHit x) => x.distance).ToList();
                 PlayerControllerB localPlayerController = GameNetworkManager.Instance.localPlayerController;
+                List<int> playerIDs = new List<int>();
                 for (int i = 0; i < objectsHitByRockList.Count; i++)
                 {
-                    if (objectsHitByRockList[i].GetType().Equals(typeof(Turret)))
-                    {
-                        
-                        break;
-                    }
+                    mls.LogInfo(String.Format("OBJECT HIT BY ROCK SPHERECAST: {0}, TYPE: {1}",objectsHitByRockList[i].collider.gameObject, objectsHitByRockList[i].collider.gameObject.GetType()));
                     IHittable component;
                     PlayerControllerB componentPlayer;
+                    EnemyAI componentEnemy;
                     RaycastHit hitInfo;
                     if (objectsHitByRockList[i].transform.gameObject.layer == 8 || objectsHitByRockList[i].transform.gameObject.layer == 11)
                     {
-                        string text = objectsHitByRockList[i].collider.gameObject.tag;
-                        for (int j = 0; j < StartOfRound.Instance.footstepSurfaces.Length; j++)
-                        {
-                            if (StartOfRound.Instance.footstepSurfaces[j].surfaceTag == text)
-                            {
-                                break;
-                            }
-                        }
+                        
                     }
                     else if (objectsHitByRockList[i].transform.TryGetComponent<IHittable>(out component) && !(objectsHitByRockList[i].transform == playerHeldBy.transform) && (objectsHitByRockList[i].point == Vector3.zero || !Physics.Linecast(playerHeldBy.gameplayCamera.transform.position, objectsHitByRockList[i].point, out hitInfo, StartOfRound.Instance.collidersAndRoomMaskAndDefault)))
                     {
                         Vector3 forward = playerHeldBy.gameplayCamera.transform.forward;
                         Debug.DrawRay(objectsHitByRockList[i].point, Vector3.up * 0.25f, Color.green, 5f);
-                        mls.LogInfo("OBJECT HIT BY ROCK SPHERECAST: " + objectsHitByRockList[i]);
                         try
                         {
+                            mls.LogInfo("ROCK HIT IHITTABLE: " + component);
+                            mls.LogInfo("IHITTABLE TYPE: " + component.GetType());
                             // Set to 1 for test, 101 for real
-                            int randomNumber = UnityEngine.Random.Range(0, 51);
-                            if (randomNumber == 0)
+                            int randomNumber = UnityEngine.Random.Range(0, 101);
+                            if (component.GetType().Equals(typeof(Landmine)))
                             {
-                                component.Hit(10, forward, playerHeldBy, playHitSFX: true);
+                                
+                            }
+                            else if (component.GetType().Equals(typeof(Turret)))
+                            {
+                                component.Hit(1, forward, playerHeldBy, playHitSFX: true);
+                            }
+                            else if (randomNumber == 0)
+                            {
+                                if(objectsHitByRockList[i].transform.TryGetComponent<PlayerControllerB>(out componentPlayer))
+                                {
+                                    componentPlayer.KillPlayer(Vector3.zero, true, CauseOfDeath.Bludgeoning);
+                                }
+                                else if (objectsHitByRockList[i].transform.TryGetComponent<EnemyAI>(out componentEnemy))
+                                {
+                                    componentEnemy.KillEnemyServerRpc(false);
+                                }
+                                else
+                                {
+                                    // Backup code in case it is not player/not enemy but does have a hit component (this likely isn't neccesary, but im leaving it here in case)
+                                    //component.Hit(10, forward, playerHeldBy, playHitSFX: true);
+                                }
                             }
                             else if (objectsHitByRockList[i].transform.TryGetComponent<PlayerControllerB>(out componentPlayer))
                             {
-                                if(localPlayerController == componentPlayer)
+                                mls.LogInfo("Attempting to hit player:");
+                                if(!(playerIDs.Contains((int)componentPlayer.playerClientId)))
                                 {
-                                    mls.LogInfo("LOCALPLAYERCONTROLLER DETECTED: " + localPlayerController.ToString());
-                                    localPlayerController.DamagePlayer(1,true, true, CauseOfDeath.Blast);
+                                    mls.LogInfo("Adding player to list");
+                                    playerIDs.Add((int)componentPlayer.playerClientId);
+                                    componentPlayer.DamagePlayerFromOtherClientServerRpc(1, playerHeldBy.transform.forward, (int)playerHeldBy.playerClientId);
+                                }
+                                else
+                                {
+                                    mls.LogInfo("Player was on list");
                                 }
                             }
-                        }
-                        catch (Exception arg)
-                        {
-                            Debug.Log($"Exception caught when hitting object with shovel from player #{playerHeldBy.playerClientId}: {arg}");
-                        }
-                    }
-                    else if(objectsHitByRockList[i].transform.TryGetComponent<IHittable>(out component))
-                    {
-                        Vector3 forward = playerHeldBy.gameplayCamera.transform.forward;
-                        try
-                        {
-                            if (objectsHitByRockList[i].GetType().Equals(typeof(Turret)))
+                            else if (objectsHitByRockList[i].transform.TryGetComponent<EnemyAI>(out componentEnemy))
                             {
-                                component.Hit(1, forward, playerHeldBy, playHitSFX: true);
-                                continue;
+                                componentEnemy.HitEnemyServerRpc(1, (int)playerHeldBy.playerClientId, true);
                             }
                         }
                         catch (Exception arg)
                         {
-                            Debug.Log($"Exception caught when hitting object with shovel from player #{playerHeldBy.playerClientId}: {arg}");
+                            Debug.Log($"Exception caught when hitting object with ROCK from player #{playerHeldBy.playerClientId}: {arg}");
                         }
                     }
+                    
                 }
                 playerHeldBy.DiscardHeldObject(placeObject: true, null, GetRockThrowDestination());
+                playerIDs.Clear();
             }
         }
 

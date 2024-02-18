@@ -1,8 +1,8 @@
 {
     "name": "RockCompany",
-    "version_number": "1.0.0",
+    "version_number": "1.1.0",
     "website_url": "https://github.com/Jamieson-H7/RockCompany",
-    "description": "Rock Company: A mod that adds a rock… that works! Throw it at things for a 1 in 100 chance to kill it instantly!",
+    "description": "Rock Company: A mod that adds a rock… that works! Throw it at things to deal minuscule damage, or a 1 in 100 chance to kill it instantly!",
     "dependencies": [
         "BepInEx-BepInExPack-5.4.2100",
         "Evaisa-LethalLib-0.14.2",
